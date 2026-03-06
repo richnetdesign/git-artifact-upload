@@ -12,7 +12,7 @@ Artifact upload (default behavior):
 
 ```yaml
 - name: Upload artifact
-  uses: richnetdesign/git-artifact-upload@v1
+  uses: richnetdesign/git-artifact-upload@v2
   with:
     name: my-artifact
     path: build/output/**
@@ -23,7 +23,7 @@ S3-compatible upload only:
 
 ```yaml
 - name: Upload to S3-compatible storage
-  uses: richnetdesign/git-artifact-upload@v1
+  uses: richnetdesign/git-artifact-upload@v2
   with:
     upload-target: s3
     name: my-build
@@ -43,7 +43,7 @@ Upload to both artifact store and S3-compatible storage:
 
 ```yaml
 - name: Upload artifact + S3
-  uses: richnetdesign/git-artifact-upload@v1
+  uses: richnetdesign/git-artifact-upload@v2
   with:
     upload-target: both
     name: windows-msix
@@ -56,6 +56,24 @@ Upload to both artifact store and S3-compatible storage:
     s3-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
 ```
 
+Template-driven naming (version/build/obfuscation):
+
+```yaml
+- name: Upload release bundle
+  uses: richnetdesign/git-artifact-upload@v2
+  with:
+    name: port-scanner
+    path: build/linux/x64/release/bundle/**
+    version-source: git-describe
+    build-type: release
+    obfuscated: true
+    name-template: "{name}-{version}-{build_type}{obf_suffix}"
+    upload-target: both
+    s3-bucket: ci-artifacts
+    s3-prefix: releases/
+    append-resolved-name-to-s3-prefix: true
+```
+
 ## Inputs
 
 Common:
@@ -64,6 +82,13 @@ Common:
 - `path` (required): file/glob path(s); newline-separated patterns supported.
 - `upload-target` (optional, default `artifact`): `artifact`, `s3`, `both`.
 - `if-no-files-found` (optional, default `warn`): `warn`, `error`, `ignore`.
+- `version` (optional): explicit version string.
+- `version-source` (optional, default `none`): `none`, `git-tag`, `git-describe`.
+- `build-type` (optional): `debug` or `release`.
+- `obfuscated` (optional, default `false`): `true` or `false`.
+- `name-template` (optional, default `{name}`): placeholders:
+  - `{name}`, `{version}`, `{build_type}`, `{obfuscated}`, `{obf_suffix}`, `{sha}`, `{run_number}`
+- `sanitize-name` (optional, default `true`): sanitize resolved name to safe characters.
 
 Artifact-related:
 
@@ -76,6 +101,7 @@ S3-related:
 
 - `s3-bucket` (required when `upload-target` is `s3` or `both`)
 - `s3-prefix` (optional)
+- `append-resolved-name-to-s3-prefix` (optional, default `false`)
 - `s3-endpoint-url` (optional, required for non-AWS S3 services)
 - `s3-region` (optional, default `us-east-1`)
 - `s3-access-key-id` (optional)
@@ -87,11 +113,12 @@ S3-related:
 
 - For SeaweedFS / RustFS-compatible APIs, set `s3-endpoint-url` and keep `s3-force-path-style: true`.
 - If `aws` CLI is missing on the runner, this action installs it via `python3 -m pip install --user awscli`.
+- `version-source` uses git metadata from the checked-out workspace. For accurate describe/tag values, use `actions/checkout` with `fetch-depth: 0`.
 
 ## Release
 
 1. Commit and push to `main`.
-2. Create a tag like `v1.0.0`.
-3. Move major tag `v1` to that commit.
+2. Create a tag like `v2.0.0`.
+3. Move major tag `v2` to that commit.
 
-Consumers should use `@v1` instead of `@main`.
+Consumers should use `@v2` instead of `@main`.

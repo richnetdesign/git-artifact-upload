@@ -29,6 +29,30 @@ inputs:
     description: Include dotfiles in upload if supported
     required: false
     default: 'false'
+  version:
+    description: Explicit version string used for naming (overrides version-source)
+    required: false
+    default: ''
+  version-source:
+    description: How to derive version when version is empty (none|git-tag|git-describe)
+    required: false
+    default: 'none'
+  build-type:
+    description: Optional build type for naming (debug|release)
+    required: false
+    default: ''
+  obfuscated:
+    description: Whether build is obfuscated (true|false)
+    required: false
+    default: 'false'
+  name-template:
+    description: "Template for resolved upload name: {name} {version} {build_type} {obfuscated} {obf_suffix} {sha} {run_number}"
+    required: false
+    default: '{name}'
+  sanitize-name:
+    description: Sanitize resolved name to safe characters [A-Za-z0-9._-]
+    required: false
+    default: 'true'
 
   upload-target:
     description: "Upload destination: artifact, s3, or both"
@@ -43,6 +67,10 @@ inputs:
     description: Prefix/folder path inside bucket
     required: false
     default: ''
+  append-resolved-name-to-s3-prefix:
+    description: Append resolved upload name to s3-prefix (true|false)
+    required: false
+    default: 'false'
   s3-endpoint-url:
     description: S3 endpoint URL for SeaweedFS/RustFS/other compatible backends
     required: false
@@ -68,14 +96,113 @@ inputs:
     required: false
     default: 'true'
 
+outputs:
+  resolved-name:
+    description: Final resolved upload name after template expansion.
+    value: ${{ steps.resolve.outputs.resolved-name }}
+  resolved-version:
+    description: Final resolved version used in template expansion.
+    value: ${{ steps.resolve.outputs.resolved-version }}
+
 runs:
   using: composite
   steps:
+    - name: Resolve upload name
+      id: resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        base_name="${{ inputs.name }}"
+        template="${{ inputs.name-template }}"
+        version_input="${{ inputs.version }}"
+        version_source="${{ inputs.version-source }}"
+        build_type="${{ inputs.build-type }}"
+        obfuscated="${{ inputs.obfuscated }}"
+        sanitize="${{ inputs.sanitize-name }}"
+
+        case "$version_source" in
+          none|git-tag|git-describe) ;;
+          *)
+            echo "Invalid version-source: $version_source (expected none|git-tag|git-describe)"
+            exit 1
+            ;;
+        esac
+
+        case "$build_type" in
+          ""|debug|release) ;;
+          *)
+            echo "Invalid build-type: $build_type (expected debug|release)"
+            exit 1
+            ;;
+        esac
+
+        case "$obfuscated" in
+          true|false) ;;
+          *)
+            echo "Invalid obfuscated: $obfuscated (expected true|false)"
+            exit 1
+            ;;
+        esac
+
+        case "$sanitize" in
+          true|false) ;;
+          *)
+            echo "Invalid sanitize-name: $sanitize (expected true|false)"
+            exit 1
+            ;;
+        esac
+
+        resolved_version="$version_input"
+        if [ -z "$resolved_version" ]; then
+          case "$version_source" in
+            none)
+              resolved_version=""
+              ;;
+            git-tag)
+              resolved_version="$(git describe --tags --exact-match 2>/dev/null || true)"
+              ;;
+            git-describe)
+              resolved_version="$(git describe --tags --always --dirty 2>/dev/null || true)"
+              ;;
+          esac
+        fi
+
+        sha="$(git rev-parse --short HEAD 2>/dev/null || true)"
+        if [ -z "$sha" ] && [ -n "${GITHUB_SHA:-}" ]; then
+          sha="${GITHUB_SHA:0:7}"
+        fi
+
+        obf_suffix=""
+        if [ "$obfuscated" = "true" ]; then
+          obf_suffix="-obf"
+        fi
+
+        run_number="${GITHUB_RUN_NUMBER:-}"
+        resolved_name="$template"
+        resolved_name="${resolved_name//\{name\}/$base_name}"
+        resolved_name="${resolved_name//\{version\}/$resolved_version}"
+        resolved_name="${resolved_name//\{build_type\}/$build_type}"
+        resolved_name="${resolved_name//\{obfuscated\}/$obfuscated}"
+        resolved_name="${resolved_name//\{obf_suffix\}/$obf_suffix}"
+        resolved_name="${resolved_name//\{sha\}/$sha}"
+        resolved_name="${resolved_name//\{run_number\}/$run_number}"
+
+        if [ "$sanitize" = "true" ]; then
+          resolved_name="$(printf '%s' "$resolved_name" | tr '[:space:]' '-' | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g')"
+        fi
+        if [ -z "$resolved_name" ]; then
+          resolved_name="$base_name"
+        fi
+
+        echo "resolved-name=$resolved_name" >> "$GITHUB_OUTPUT"
+        echo "resolved-version=$resolved_version" >> "$GITHUB_OUTPUT"
+
     - name: Upload artifact (GitHub)
       if: ${{ (inputs.upload-target == 'artifact' || inputs.upload-target == 'both') && github.server_url == 'https://github.com' }}
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ inputs.name }}
+        name: ${{ steps.resolve.outputs.resolved-name }}
         path: ${{ inputs.path }}
         retention-days: ${{ inputs.retention-days }}
         if-no-files-found: ${{ inputs.if-no-files-found }}
@@ -87,7 +214,7 @@ runs:
       if: ${{ (inputs.upload-target == 'artifact' || inputs.upload-target == 'both') && github.server_url != 'https://github.com' }}
       uses: ChristopherHX/gitea-upload-artifact@main
       with:
-        name: ${{ inputs.name }}
+        name: ${{ steps.resolve.outputs.resolved-name }}
         path: ${{ inputs.path }}
         retention-days: ${{ inputs.retention-days }}
         if-no-files-found: ${{ inputs.if-no-files-found }}
@@ -113,6 +240,7 @@ runs:
         AWS_ACCESS_KEY_ID: ${{ inputs.s3-access-key-id }}
         AWS_SECRET_ACCESS_KEY: ${{ inputs.s3-secret-access-key }}
         AWS_SESSION_TOKEN: ${{ inputs.s3-session-token }}
+        RESOLVED_NAME: ${{ steps.resolve.outputs.resolved-name }}
       run: |
         set -euo pipefail
 
@@ -131,6 +259,16 @@ runs:
         fi
 
         prefix="${{ inputs.s3-prefix }}"
+        if [ "${{ inputs.append-resolved-name-to-s3-prefix }}" = "true" ]; then
+          if [ -n "$prefix" ]; then
+            prefix="${prefix%/}/${RESOLVED_NAME}"
+          else
+            prefix="${RESOLVED_NAME}"
+          fi
+        elif [ "${{ inputs.append-resolved-name-to-s3-prefix }}" != "false" ]; then
+          echo "Invalid append-resolved-name-to-s3-prefix value: ${{ inputs.append-resolved-name-to-s3-prefix }} (expected true|false)"
+          exit 1
+        fi
         prefix="${prefix#/}"
         if [ -n "$prefix" ] && [ "${prefix: -1}" != "/" ]; then
           prefix="$prefix/"
