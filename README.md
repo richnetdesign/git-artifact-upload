@@ -74,6 +74,23 @@ Template-driven naming (version/build/obfuscation):
     append-resolved-name-to-s3-prefix: true
 ```
 
+Max-detail suffix toggle:
+
+```yaml
+- name: Upload with max detail suffix
+  uses: richnetdesign/git-artifact-upload@v2
+  with:
+    name: port-scanner
+    path: build/linux/x64/release/bundle/**
+    version-source: git-describe
+    build-type: release
+    obfuscated: true
+    append-max-detail-suffix: true
+```
+
+Example resolved name:
+`port-scanner-v2.0.0-3-g89b4358-release-obf-89b4358-run2451`
+
 ## Inputs
 
 Common:
@@ -89,6 +106,7 @@ Common:
 - `name-template` (optional, default `{name}`): placeholders:
   - `{name}`, `{version}`, `{build_type}`, `{obfuscated}`, `{obf_suffix}`, `{sha}`, `{run_number}`
 - `sanitize-name` (optional, default `true`): sanitize resolved name to safe characters.
+- `append-max-detail-suffix` (optional, default `false`): append `version-build-obf/plain-sha-run<number>` details to resolved name.
 
 Artifact-related:
 

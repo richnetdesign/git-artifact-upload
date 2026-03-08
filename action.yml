@@ -53,6 +53,10 @@ inputs:
     description: Sanitize resolved name to safe characters [A-Za-z0-9._-]
     required: false
     default: 'true'
+  append-max-detail-suffix:
+    description: Append max-detail suffix (version, build type, obfuscation, sha, run number) to resolved name
+    required: false
+    default: 'false'
 
   upload-target:
     description: "Upload destination: artifact, s3, or both"
@@ -120,6 +124,7 @@ runs:
         build_type="${{ inputs.build-type }}"
         obfuscated="${{ inputs.obfuscated }}"
         sanitize="${{ inputs.sanitize-name }}"
+        append_max_detail_suffix="${{ inputs.append-max-detail-suffix }}"
 
         case "$version_source" in
           none|git-tag|git-describe) ;;
@@ -149,6 +154,14 @@ runs:
           true|false) ;;
           *)
             echo "Invalid sanitize-name: $sanitize (expected true|false)"
+            exit 1
+            ;;
+        esac
+
+        case "$append_max_detail_suffix" in
+          true|false) ;;
+          *)
+            echo "Invalid append-max-detail-suffix: $append_max_detail_suffix (expected true|false)"
             exit 1
             ;;
         esac
@@ -187,6 +200,32 @@ runs:
         resolved_name="${resolved_name//\{obf_suffix\}/$obf_suffix}"
         resolved_name="${resolved_name//\{sha\}/$sha}"
         resolved_name="${resolved_name//\{run_number\}/$run_number}"
+
+        if [ "$append_max_detail_suffix" = "true" ]; then
+          detail_parts=()
+          if [ -n "$resolved_version" ]; then
+            detail_parts+=("$resolved_version")
+          fi
+          if [ -n "$build_type" ]; then
+            detail_parts+=("$build_type")
+          fi
+          if [ "$obfuscated" = "true" ]; then
+            detail_parts+=("obf")
+          else
+            detail_parts+=("plain")
+          fi
+          if [ -n "$sha" ]; then
+            detail_parts+=("$sha")
+          fi
+          if [ -n "$run_number" ]; then
+            detail_parts+=("run$run_number")
+          fi
+
+          if [ ${#detail_parts[@]} -gt 0 ]; then
+            detail_suffix="$(IFS=-; echo "${detail_parts[*]}")"
+            resolved_name="${resolved_name}-${detail_suffix}"
+          fi
+        fi
 
         if [ "$sanitize" = "true" ]; then
           resolved_name="$(printf '%s' "$resolved_name" | tr '[:space:]' '-' | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g')"
