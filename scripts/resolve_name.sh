@@ -95,15 +95,16 @@ if [ "$append_max_detail_suffix" = "true" ]; then
   fi
   if [ "$obfuscated" = "true" ]; then
     detail_parts+=("obf")
-  else
-    detail_parts+=("plain")
+  #else
+    #detail_parts+=("plain")
   fi
-  if [ -n "$sha" ]; then
-    detail_parts+=("$sha")
-  fi
-  if [ -n "$run_number" ]; then
-    detail_parts+=("run$run_number")
-  fi
+  # if [ -n "$sha" ]; then
+  #   detail_parts+=("$sha")
+  # fi
+
+  # if [ -n "$run_number" ]; then
+  #   detail_parts+=("run$run_number")
+  # fi
 
   if [ ${#detail_parts[@]} -gt 0 ]; then
     detail_suffix="$(IFS=-; echo "${detail_parts[*]}")"
