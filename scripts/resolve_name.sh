@@ -5,6 +5,8 @@ base_name="${INPUT_NAME}"
 template="${INPUT_NAME_TEMPLATE}"
 version_input="${INPUT_VERSION}"
 version_source="${INPUT_VERSION_SOURCE}"
+version_validation_pattern="${INPUT_VERSION_VALIDATION_PATTERN}"
+version_validation_mode="${INPUT_VERSION_VALIDATION_MODE}"
 build_type="${INPUT_BUILD_TYPE}"
 obfuscated="${INPUT_OBFUSCATED}"
 sanitize="${INPUT_SANITIZE_NAME}"
@@ -22,6 +24,14 @@ case "$build_type" in
   ""|debug|release) ;;
   *)
     echo "Invalid build-type: $build_type (expected debug|release)"
+    exit 1
+    ;;
+esac
+
+case "$version_validation_mode" in
+  ignore|warn|error) ;;
+  *)
+    echo "Invalid version-validation-mode: $version_validation_mode (expected ignore|warn|error)"
     exit 1
     ;;
 esac
@@ -117,6 +127,23 @@ if [ "$sanitize" = "true" ]; then
 fi
 if [ -z "$resolved_name" ]; then
   resolved_name="$base_name"
+fi
+
+if [ -n "$version_validation_pattern" ]; then
+  if ! printf '%s\n' "$resolved_version" | grep -Eq -- "$version_validation_pattern"; then
+    message="Resolved version '${resolved_version}' did not match version-validation-pattern '${version_validation_pattern}'"
+    case "$version_validation_mode" in
+      ignore)
+        ;;
+      warn)
+        echo "::warning::$message"
+        ;;
+      error)
+        echo "$message"
+        exit 1
+        ;;
+    esac
+  fi
 fi
 
 echo "resolved-name=$resolved_name" >> "$GITHUB_OUTPUT"

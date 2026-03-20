@@ -37,6 +37,14 @@ inputs:
     description: How to derive version when version is empty (none|git-tag|git-describe)
     required: false
     default: 'none'
+  version-validation-pattern:
+    description: Optional regex pattern that the resolved version is expected to match
+    required: false
+    default: ''
+  version-validation-mode:
+    description: How to handle version validation mismatches (ignore|warn|error)
+    required: false
+    default: 'ignore'
   build-type:
     description: Optional build type for naming (debug|release)
     required: false
@@ -119,6 +127,8 @@ runs:
         INPUT_NAME_TEMPLATE: ${{ inputs.name-template }}
         INPUT_VERSION: ${{ inputs.version }}
         INPUT_VERSION_SOURCE: ${{ inputs.version-source }}
+        INPUT_VERSION_VALIDATION_PATTERN: ${{ inputs.version-validation-pattern }}
+        INPUT_VERSION_VALIDATION_MODE: ${{ inputs.version-validation-mode }}
         INPUT_BUILD_TYPE: ${{ inputs.build-type }}
         INPUT_OBFUSCATED: ${{ inputs.obfuscated }}
         INPUT_SANITIZE_NAME: ${{ inputs.sanitize-name }}

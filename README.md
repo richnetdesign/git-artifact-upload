@@ -74,6 +74,19 @@ Template-driven naming (version/build/obfuscation):
     append-resolved-name-to-s3-prefix: true
 ```
 
+Version validation warning:
+
+```yaml
+- name: Upload release bundle
+  uses: richnetdesign/git-artifact-upload@v2
+  with:
+    name: port-scanner
+    path: build/linux/x64/release/bundle/**
+    version-source: git-tag
+    version-validation-pattern: '^v[0-9]+\\.[0-9]+\\.[0-9]+$'
+    version-validation-mode: warn
+```
+
 Max-detail suffix toggle:
 
 ```yaml
@@ -101,6 +114,8 @@ Common:
 - `if-no-files-found` (optional, default `warn`): `warn`, `error`, `ignore`.
 - `version` (optional): explicit version string.
 - `version-source` (optional, default `none`): `none`, `git-tag`, `git-describe`.
+- `version-validation-pattern` (optional): regex that the resolved version should match.
+- `version-validation-mode` (optional, default `ignore`): `ignore`, `warn`, or `error`.
 - `build-type` (optional): `debug` or `release`.
 - `obfuscated` (optional, default `false`): `true` or `false`.
 - `name-template` (optional, default `{name}`): placeholders:
@@ -132,6 +147,7 @@ S3-related:
 - For SeaweedFS / RustFS-compatible APIs, set `s3-endpoint-url` and keep `s3-force-path-style: true`.
 - If `aws` CLI is missing on the runner, this action installs it via `python3 -m pip install --user awscli`.
 - `version-source` uses git metadata from the checked-out workspace. For accurate describe/tag values, use `actions/checkout` with `fetch-depth: 0`.
+- If `version-validation-pattern` is set and the resolved version does not match, `version-validation-mode: warn` emits a workflow warning and `error` fails the step.
 
 ## Release
 
