@@ -2,7 +2,7 @@
 
 Reusable GitHub Action for uploads across:
 
-- GitHub Actions artifacts (`actions/upload-artifact@v4`)
+- GitHub Actions artifacts (`actions/upload-artifact@v6`)
 - Gitea / Forgejo artifacts (`ChristopherHX/gitea-upload-artifact`)
 - S3-compatible object storage (AWS S3, SeaweedFS, RustFS-compatible endpoints)
 
@@ -148,6 +148,7 @@ S3-related:
 - If `aws` CLI is missing on the runner, this action installs it via `python3 -m pip install --user awscli`.
 - `version-source` uses git metadata from the checked-out workspace. For accurate describe/tag values, use `actions/checkout` with `fetch-depth: 0`.
 - If `version-validation-pattern` is set and the resolved version does not match, `version-validation-mode: warn` emits a workflow warning and `error` fails the step.
+- GitHub artifact uploads now use `actions/upload-artifact@v6`, which requires Actions Runner `2.327.1` or newer on self-hosted GitHub runners.
 
 ## Release
 

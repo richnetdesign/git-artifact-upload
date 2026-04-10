@@ -137,7 +137,7 @@ runs:
 
     - name: Upload artifact (GitHub)
       if: ${{ (inputs.upload-target == 'artifact' || inputs.upload-target == 'both') && github.server_url == 'https://github.com' }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ${{ steps.resolve.outputs.resolved-name }}
         path: ${{ inputs.path }}
